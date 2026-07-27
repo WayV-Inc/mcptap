@@ -102,4 +102,18 @@ export async function runSetup(ids: string[], opts: { undo: boolean; yes: boolea
       console.log(`  ${C.dim}undo anytime: mcptap setup --undo${C.reset}`);
     }
   }
+
+  // Offer always-on mode after an interactive wrap (macOS only)
+  if (!opts.undo && !opts.yes && ids.length === 0 && process.stdin.isTTY && process.platform === "darwin") {
+    const { createInterface } = await import("node:readline/promises");
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const ans = (await rl.question(`\nEnable ${C.bold}autopilot${C.reset}? New MCP servers you add later get wrapped automatically. [Y/n] `)).trim().toLowerCase();
+    rl.close();
+    if (ans === "" || ans === "y" || ans === "yes") {
+      const { autopilot } = await import("./autopilot.js");
+      await autopilot("on", targets.map((t) => t.id));
+    } else {
+      console.log(`${C.dim}Skipped. Enable later with: mcptap autopilot on${C.reset}`);
+    }
+  }
 }

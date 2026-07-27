@@ -117,5 +117,15 @@ toml = fs.readFileSync(path.join(fix, ".codex", "config.toml"), "utf8");
 if (!toml.includes('command = "npx"')) fail("undo failed for codex");
 if (toml.includes("mcptap")) fail("mcptap remnants after undo");
 
+// --- autopilot plist renderer ---
+const { renderPlist } = await import("../dist/autopilot.js");
+const plist = renderPlist("/usr/local/bin/node", "/x/dist/index.js", ["claude-code", "codex"], ["/Users/x/.claude.json", "/Users/x/.codex/config.toml"], "/Users/x/.mcptap/autopilot.log");
+if (!plist.includes("<string>setup</string>")) fail("plist missing setup arg");
+if (!plist.includes("<string>claude-code</string>")) fail("plist missing client id");
+if (!plist.includes("<string>--yes</string>")) fail("plist missing --yes");
+if (!plist.includes("<key>WatchPaths</key>")) fail("plist missing WatchPaths");
+if (!plist.includes("<string>/Users/x/.claude.json</string>")) fail("plist missing watch path");
+if (!plist.includes("<key>ThrottleInterval</key>")) fail("plist missing throttle");
+
 fs.rmSync(fix, { recursive: true, force: true });
-console.log("PASS: setup wrap/idempotency/undo OK for JSON + TOML");
+console.log("PASS: setup wrap/idempotency/undo OK for JSON + TOML; autopilot plist OK");

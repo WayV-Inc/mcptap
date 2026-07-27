@@ -40,6 +40,10 @@ Gemini CLI, LM Studio, Zed, and project `.mcp.json` files — shows what it foun
 and wraps the servers you select. Every modified config gets a timestamped
 backup, and `mcptap setup --undo` reverses it.
 
+For always-on coverage, say yes when setup offers **autopilot** (macOS): a tiny
+launchd watcher re-runs the wrap whenever a client config changes, so servers you
+add next month get logged too. `mcptap autopilot off` removes it.
+
 The manual way — wrap the server command in your MCP client config. Before:
 
 ```json

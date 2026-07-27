@@ -30,6 +30,23 @@ Flags: name client ids to skip the picker (`mcptap setup claude-code codex --yes
 `--yes` applies to all detected clients without prompting (required when no TTY);
 `--undo` reverses the wrap, restoring original commands.
 
+## `mcptap autopilot on|off|status`
+
+Always-on mode (macOS). Installs a launchd LaunchAgent that watches your client
+config files and runs `mcptap setup --yes` the moment one changes — so any MCP
+server you add later, in any wrapped client, gets wrapped automatically without
+thinking about it. `setup` offers to enable this at the end of an interactive run.
+
+- `on [clients...]` — watch all clients, or only the listed ids
+- `off` — remove the agent (existing wraps stay; `setup --undo` removes those)
+- `status` — installed or not, plus recent activity from `~/.mcptap/autopilot.log`
+
+Loop safety: the wrap is idempotent, so the config write it performs doesn't
+re-trigger meaningful work, and launchd throttles runs to at most one per 10s.
+
+On Linux, the equivalent is a systemd user path unit watching your configs and
+running `mcptap setup --yes`.
+
 ## `mcptap -- <command> [args...]`
 
 Runs `<command>` as a child process and proxies its stdio, logging all MCP
