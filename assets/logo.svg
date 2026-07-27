@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 72" role="img" aria-label="mcptap logo">
+  <style>
+    .ink { stroke: #1a1d21; }
+    @media (prefers-color-scheme: dark) { .ink { stroke: #f2f1ed; } }
+  </style>
+  <path class="ink" d="M20 8 H9 V64 H20" fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="ink" d="M76 8 H87 V64 H76" fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <line class="ink" x1="20" y1="36" x2="76" y2="36" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="48" cy="36" r="8.5" fill="#e8a33d"/>
+</svg>

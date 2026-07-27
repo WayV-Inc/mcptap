@@ -1,6 +1,8 @@
-# mcptap
+<p align="center">
+  <img src="assets/logo-wordmark.svg" width="320" alt="mcptap">
+</p>
 
-**See every tool call your AI agents make.**
+<p align="center"><strong>See every tool call your AI agents make.</strong></p>
 
 mcptap is a zero-config audit proxy for [MCP](https://modelcontextprotocol.io) servers.
 It sits between your AI client (Claude Code, Claude Desktop, Cursor, …) and any MCP
