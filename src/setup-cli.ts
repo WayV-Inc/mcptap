@@ -22,6 +22,9 @@ export async function runSetup(ids: string[], opts: { undo: boolean; yes: boolea
   if (notFound.length && !opts.yes && ids.length === 0) {
     console.log(`${C.dim}not detected: ${notFound.map((c) => c.name).join(", ")}${C.reset}\n`);
   }
+  if (!opts.undo && found.some((c) => c.wrappable + c.wrapped === 0)) {
+    console.log(`${C.dim}Tip: some clients have no MCP servers yet — ${C.reset}${C.cyan}mcptap add${C.reset}${C.dim} installs ready-to-use ones (filesystem, memory, …), pre-wrapped.${C.reset}\n`);
+  }
 
   let targets: ClientStatus[];
 

@@ -30,6 +30,26 @@ Flags: name client ids to skip the picker (`mcptap setup claude-code codex --yes
 `--yes` applies to all detected clients without prompting (required when no TTY);
 `--undo` reverses the wrap, restoring original commands.
 
+## `mcptap add [servers...] [--to ids] [--dir path]`
+
+Installs ready-to-use MCP servers into your clients, already wrapped, so they're
+logged from their very first call. Interactive by default; scriptable with flags:
+
+```sh
+mcptap add                                       # pick servers and clients from lists
+mcptap add memory --to claude-code,cursor --yes  # non-interactive
+mcptap add filesystem --dir ~/Projects --yes     # scope the filesystem server
+```
+
+Catalog (all zero-config, official reference servers): `filesystem` (read/write a
+folder you choose), `memory` (persistent knowledge-graph memory),
+`sequential-thinking` (structured reasoning), `everything` (demo/test server).
+
+Dedicated config files (Cursor, Claude Desktop, LM Studio, VS Code, …) are created
+if missing; app-managed files (`~/.claude.json`, Codex TOML, Zed settings) are only
+edited, never created. Existing server names are never overwritten, and every
+modified file gets a timestamped backup.
+
 ## `mcptap autopilot on|off|status`
 
 Always-on mode (macOS). Installs a launchd LaunchAgent that watches your client

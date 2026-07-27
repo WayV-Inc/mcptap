@@ -8,6 +8,10 @@ Usage:
   mcptap setup [clients...]         Interactive onboarding: auto-wrap your MCP
                                     client configs (Claude Code, Claude Desktop,
                                     Codex, Cursor, Windsurf, project .mcp.json)
+  mcptap add [servers...]           Install ready-to-use MCP servers into your
+                                    clients, pre-wrapped for logging. Catalog:
+                                    filesystem, memory, sequential-thinking,
+                                    everything. Flags: --to <ids>, --dir <path>
   mcptap autopilot on|off|status    Keep configs wrapped automatically: watches
                                     client config files and wraps new MCP
                                     servers the moment they're added (macOS)
@@ -51,6 +55,9 @@ if (sep >= 0) {
   const ids = rest.filter((a) => !a.startsWith("-"));
   const { runSetup } = await import("./setup-cli.js");
   await runSetup(ids, { undo, yes });
+} else if (argv[0] === "add") {
+  const { runAdd } = await import("./add.js");
+  await runAdd(argv.slice(1));
 } else if (argv[0] === "autopilot") {
   const { autopilot } = await import("./autopilot.js");
   await autopilot(argv[1] || "status", argv.slice(2).filter((a) => !a.startsWith("-")));
