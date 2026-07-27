@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 
 const home = () => process.env.MCPTAP_HOME || os.homedir();
 
@@ -61,8 +62,35 @@ export function clientDefs(): ClientDef[] {
 // ---------- entry shapes ----------
 // Standard: { command: "npx", args: [...] }
 // Zed:      { command: { path: "npx", args: [...] } }
+//
+// Wrapping writes ABSOLUTE paths (node binary + mcptap entry script) so that
+// GUI-launched clients (Claude Desktop, ChatGPT/Codex) — which have a minimal
+// PATH without npm's bin dir — can still start the proxy. Bare "mcptap" only
+// resolves in terminal-launched clients.
 
 type Entry = Record<string, any>;
+
+/** Absolute node + absolute mcptap entry script, resolvable from any context. */
+export function selfCmd(): { node: string; script: string } {
+  return {
+    node: process.execPath,
+    script: fileURLToPath(new URL("./index.js", import.meta.url)),
+  };
+}
+
+function isTapScript(p: string): boolean {
+  const b = path.basename(p);
+  return b === "mcptap" || b === "mcptap.js" || (b === "index.js" && /mcptap/.test(p));
+}
+
+/** Recognize both wrapped forms: legacy `mcptap -- …` and `node …/index.js -- …`. */
+function wrappedInfo(cmd: string, args: string[]): { orig: string; rest: string[] } | null {
+  if (isTapScript(cmd) && args[0] === "--" && args.length >= 2)
+    return { orig: args[1], rest: args.slice(2) };
+  if (args.length >= 3 && isTapScript(args[0]) && args[1] === "--")
+    return { orig: args[2], rest: args.slice(3) };
+  return null;
+}
 
 function shape(e: Entry): { cmd: string; args: string[]; zed: boolean } | null {
   if (e.url || e.type === "http" || e.type === "sse") return null;
@@ -75,15 +103,16 @@ function shape(e: Entry): { cmd: string; args: string[]; zed: boolean } | null {
 function wrappedShape(e: Entry): { orig: string; rest: string[]; zed: boolean } | null {
   const s = shape(e);
   if (!s) return null;
-  if (path.basename(s.cmd).replace(/\.js$/, "") !== "mcptap") return null;
-  if (s.args[0] !== "--" || s.args.length < 2) return null;
-  return { orig: s.args[1], rest: s.args.slice(2), zed: s.zed };
+  const w = wrappedInfo(s.cmd, s.args);
+  return w ? { ...w, zed: s.zed } : null;
 }
 
 function wrapEntry(e: Entry): void {
   const s = shape(e)!;
-  if (s.zed) e.command = { ...e.command, path: "mcptap", args: ["--", s.cmd, ...s.args] };
-  else { e.args = ["--", s.cmd, ...s.args]; e.command = "mcptap"; }
+  const { node, script } = selfCmd();
+  const args = [script, "--", s.cmd, ...s.args];
+  if (s.zed) e.command = { ...e.command, path: node, args };
+  else { e.args = args; e.command = node; }
 }
 
 function unwrapEntry(e: Entry): void {
@@ -210,7 +239,8 @@ function scanToml(def: ClientDef): { wrappable: number; wrapped: number } {
       if (s.commandLine === undefined) continue;
       const cmd = tomlCmd(lines[s.commandLine]);
       if (!cmd) continue;
-      if (path.basename(cmd) === "mcptap") wrapped++; else wrappable++;
+      const args = (s.argsLine !== undefined ? parseTomlArray(lines[s.argsLine]) : []) ?? [];
+      if (wrappedInfo(cmd, args)) wrapped++; else wrappable++;
     }
     return { wrappable, wrapped };
   } catch {
@@ -237,19 +267,20 @@ function applyToml(def: ClientDef, undo: boolean): ApplyResult {
     const args = s.argsLine !== undefined ? parseTomlArray(lines[s.argsLine]) : [];
     if (args === null) { res.skipped.push(`${s.name} (complex args, left untouched)`); continue; }
 
+    const w = wrappedInfo(cmd, args);
     if (!undo) {
-      if (path.basename(cmd) === "mcptap") { res.skipped.push(s.name); continue; }
-      lines[s.commandLine] = `${indent}command = "mcptap"`;
-      const argsText = `${indent}args = [${["--", cmd, ...args].map(tomlStr).join(", ")}]`;
+      if (w) { res.skipped.push(s.name); continue; }
+      const { node, script } = selfCmd();
+      lines[s.commandLine] = `${indent}command = ${tomlStr(node)}`;
+      const argsText = `${indent}args = [${[script, "--", cmd, ...args].map(tomlStr).join(", ")}]`;
       if (s.argsLine !== undefined) lines[s.argsLine] = argsText;
       else lines.splice(s.commandLine + 1, 0, argsText);
       res.changed.push(s.name);
     } else {
-      if (path.basename(cmd) !== "mcptap" || !args || args[0] !== "--") continue;
-      lines[s.commandLine] = `${indent}command = ${tomlStr(args[1])}`;
-      const rest = args.slice(2);
+      if (!w) continue;
+      lines[s.commandLine] = `${indent}command = ${tomlStr(w.orig)}`;
       if (s.argsLine !== undefined) {
-        if (rest.length) lines[s.argsLine] = `${indent}args = [${rest.map(tomlStr).join(", ")}]`;
+        if (w.rest.length) lines[s.argsLine] = `${indent}args = [${w.rest.map(tomlStr).join(", ")}]`;
         else lines.splice(s.argsLine, 1);
       }
       res.changed.push(s.name);

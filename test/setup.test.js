@@ -69,27 +69,32 @@ const run = (...args) =>
 // --- wrap ---
 run("claude-code", "codex", "vscode", "zed", "--yes");
 
+// Wrapped form is GUI-safe: absolute node + absolute mcptap script
+const NODE = process.execPath;
+const SCRIPT = path.resolve(here, "..", "dist", "index.js");
+
 const vs = JSON.parse(fs.readFileSync(path.join(vsUser, "mcp.json"), "utf8"));
-if (vs.servers.memory.command !== "mcptap") fail("vscode servers-key not wrapped");
+if (vs.servers.memory.command !== NODE) fail("vscode servers-key not wrapped with abs node");
+if (vs.servers.memory.args[0] !== SCRIPT || vs.servers.memory.args[1] !== "--") fail("vscode args not GUI-safe form");
 
 const zed = JSON.parse(fs.readFileSync(path.join(zedDir, "settings.json"), "utf8"));
-if (zed.context_servers.docs.command.path !== "mcptap") fail("zed object command not wrapped");
-if (JSON.stringify(zed.context_servers.docs.command.args) !== JSON.stringify(["--", "uvx", "mcp-server-docs"])) fail("zed args wrong");
+if (zed.context_servers.docs.command.path !== NODE) fail("zed object command not wrapped");
+if (JSON.stringify(zed.context_servers.docs.command.args) !== JSON.stringify([SCRIPT, "--", "uvx", "mcp-server-docs"])) fail("zed args wrong");
 if (zed.theme !== "One Dark") fail("zed settings clobbered");
 
 const cc = JSON.parse(fs.readFileSync(path.join(fix, ".claude.json"), "utf8"));
-if (cc.mcpServers.fs.command !== "mcptap") fail("fs not wrapped");
-if (JSON.stringify(cc.mcpServers.fs.args) !== JSON.stringify(["--", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp"])) fail("fs args wrong");
+if (cc.mcpServers.fs.command !== NODE) fail("fs not wrapped with abs node");
+if (JSON.stringify(cc.mcpServers.fs.args) !== JSON.stringify([SCRIPT, "--", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp"])) fail("fs args wrong");
 if (cc.mcpServers.web.url !== "https://example.com/mcp") fail("http server touched");
-if (cc.mcpServers.done.args[1] !== "node") fail("pre-wrapped server double-wrapped");
+if (cc.mcpServers.done.args[1] !== "node") fail("legacy-wrapped server double-wrapped");
 if (!cc.someOtherState?.keep) fail("unrelated state lost");
-if (cc.projects["/Users/x/proj"].mcpServers.projsrv.command !== "mcptap") fail("nested project server not wrapped");
+if (cc.projects["/Users/x/proj"].mcpServers.projsrv.command !== NODE) fail("nested project server not wrapped");
 if (cc.projects["/Users/x/proj"].allowedTools[0] !== "keep") fail("project state lost");
 
 let toml = fs.readFileSync(path.join(fix, ".codex", "config.toml"), "utf8");
-if (!toml.includes('command = "mcptap"')) fail("codex not wrapped");
-if (!toml.includes('args = ["--", "npx", "-y", "@modelcontextprotocol/server-github"]')) fail("codex github args wrong");
-if (!toml.includes('args = ["--", "node"]')) fail("codex argless server not wrapped");
+if (!toml.includes(`command = ${JSON.stringify(NODE)}`)) fail("codex not wrapped with abs node");
+if (!toml.includes(`args = [${JSON.stringify(SCRIPT)}, "--", "npx", "-y", "@modelcontextprotocol/server-github"]`)) fail("codex github args wrong");
+if (!toml.includes(`args = [${JSON.stringify(SCRIPT)}, "--", "node"]`)) fail("codex argless server not wrapped");
 if (!toml.includes('env = { "GITHUB_TOKEN" = "x" }')) fail("codex env line lost");
 if (!toml.includes("[other]")) fail("unrelated toml section lost");
 
