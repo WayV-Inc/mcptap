@@ -4,6 +4,17 @@
 
 <p align="center"><strong>See every tool call your AI agents make.</strong></p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/@wayv-software/mcptap"><img src="https://img.shields.io/npm/v/@wayv-software/mcptap?color=e8a33d&label=npm" alt="npm"></a>
+  <a href="https://github.com/WayV-Inc/mcptap/actions/workflows/ci.yml"><img src="https://github.com/WayV-Inc/mcptap/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/dependencies-0-7ebf7d" alt="zero dependencies">
+  <img src="https://img.shields.io/badge/license-MIT-7abac9" alt="MIT">
+</p>
+
+<p align="center">
+  <img src="assets/demo.gif" width="820" alt="mcptap setup and live dashboard">
+</p>
+
 mcptap is a zero-config audit proxy for [MCP](https://modelcontextprotocol.io) servers.
 It sits between your AI client (Claude Code, Claude Desktop, Cursor, …) and any MCP
 server, passing traffic through untouched while logging every request, response, and
@@ -63,10 +74,26 @@ After:
 Then watch the traffic:
 
 ```sh
-mcptap logs           # last 50 entries across all servers
-mcptap logs -f        # follow live
-mcptap logs server-filesystem --tail 200
+mcptap watch          # live dashboard — throughput, per-tool activity, alerts
+mcptap logs -f        # raw stream, follow live
+mcptap stats          # totals, error rates, p95 latency per tool
 ```
+
+## Tool-change detection
+
+mcptap fingerprints every tool definition the first time it sees it. If a server
+later changes a tool's **description** or **input schema**, you get an alert:
+
+```
+⚠  tool changes detected   possible rug pull — MCP03
+   ● github  ·  create_issue   description-changed
+```
+
+This is the rug-pull / tool-poisoning pattern from the OWASP MCP Top 10 (MCP03):
+a server serves benign definitions on first contact, then swaps in hidden
+instructions later. Tool descriptions land in your model's context as trusted
+text, so a silent change is a real attack surface. Reset baselines with
+`mcptap trust --reset`.
 
 Example output:
 

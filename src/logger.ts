@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { checkToolList } from "./tools.js";
 
 const MAX_BYTES = Number(process.env.MCPTAP_MAX_BYTES || 4096);
 const SECRET_KEY = /token|secret|password|passwd|api[_-]?key|authorization|credential/i;
@@ -13,7 +14,7 @@ export interface LogEntry {
   ts: string;
   server: string;
   dir: Direction;
-  kind: "request" | "response" | "notification" | "raw";
+  kind: "request" | "response" | "notification" | "raw" | "alert";
   id?: string | number | null;
   method?: string;
   params?: unknown;
@@ -21,6 +22,11 @@ export interface LogEntry {
   error?: unknown;
   durationMs?: number;
   raw?: string;
+  /** alert fields */
+  severity?: "warn" | "info";
+  tool?: string;
+  change?: string;
+  detail?: string;
 }
 
 /** Recursively redact secret-looking keys and truncate big strings. */
@@ -103,6 +109,13 @@ export class AuditLogger {
           ? { error: sanitize(msg.error) }
           : { result: sanitize(msg.result) }),
       });
+      // Tool-change detection: fingerprint tool definitions on every tools/list
+      if (req?.method === "tools/list" && msg.result !== undefined) {
+        try {
+          for (const a of checkToolList(this.server, msg.result))
+            this.write({ ts: new Date().toISOString(), server: this.server, dir, kind: "alert", ...a });
+        } catch { /* never fatal */ }
+      }
     }
   }
 

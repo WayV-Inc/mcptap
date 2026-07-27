@@ -104,6 +104,22 @@ Output line anatomy:
 14:02:21 server-filesystem · notifications/progress              ← notification
 ```
 
+## `mcptap watch [server]`
+
+Full-screen live dashboard. Shows total calls, error count, a 90-second
+throughput sparkline, a per-server table with the busiest tool for each, a
+scrolling activity feed, and any tool-change alerts. Press `q` to quit.
+
+Starts from "now" — it tails new log entries rather than replaying history, so
+it stays responsive no matter how large your logs are. Use `mcptap stats` for
+the historical view.
+
+## `mcptap trust --reset [server]`
+
+Deletes stored tool fingerprints (all servers, or one). The next `tools/list`
+becomes the new trusted baseline. Use after you've reviewed a legitimate server
+update and want to stop the alerts.
+
 ## `mcptap stats [server]`
 
 Aggregated view of everything logged: per server and per tool, the call count,

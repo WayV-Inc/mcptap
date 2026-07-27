@@ -20,6 +20,10 @@ Usage:
                                     servers the moment they're added (macOS)
   mcptap -- <command> [args...]     Run an MCP server through the audit proxy
   mcptap logs [server] [options]    View logged traffic (--json for raw JSONL)
+  mcptap watch [server]             Live dashboard: throughput, per-server and
+                                    per-tool activity, tool-change alerts
+  mcptap trust --reset [server]     Forget tool fingerprints; next tools/list
+                                    becomes the new trusted baseline
   mcptap stats [server]             Call counts, error rates, and latency
                                     per server and tool
 
@@ -74,6 +78,19 @@ if (sep >= 0) {
   const tail = tailIdx >= 0 ? Number(rest[tailIdx + 1]) || 50 : 50;
   const server = rest.find((a) => !a.startsWith("-") && a !== String(tail));
   showLogs(server, tail, follow, json);
+} else if (argv[0] === "trust") {
+  const { resetBaseline } = await import("./tools.js");
+  if (argv.includes("--reset")) {
+    const server = argv.slice(1).find((a) => !a.startsWith("-"));
+    const n = resetBaseline(server);
+    console.log(`Reset tool baselines for ${n} server${n === 1 ? "" : "s"}. The next tools/list re-establishes them.`);
+  } else {
+    console.log("Usage: mcptap trust --reset [server]");
+    process.exitCode = 1;
+  }
+} else if (argv[0] === "watch") {
+  const { runWatch } = await import("./watch.js");
+  runWatch(argv.slice(1).find((a) => !a.startsWith("-")));
 } else if (argv[0] === "stats") {
   const { showStats } = await import("./stats.js");
   showStats(argv.slice(1).find((a) => !a.startsWith("-")));
