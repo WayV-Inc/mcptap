@@ -19,8 +19,10 @@ is invisible. mcptap makes it visible.
 ## Install
 
 ```sh
-npm install -g mcptap
+npm install -g @wayv-software/mcptap
 ```
+
+The command is still just `mcptap`.
 
 ## Use
 

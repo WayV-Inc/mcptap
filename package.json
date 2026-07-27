@@ -1,6 +1,14 @@
 {
-  "name": "mcptap",
+  "name": "@wayv-software/mcptap",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WayV-Inc/mcptap.git"
+  },
+  "homepage": "https://github.com/WayV-Inc/mcptap#readme",
   "description": "Audit proxy for MCP servers — see and log every tool call your AI agents make",
   "type": "module",
   "bin": {
