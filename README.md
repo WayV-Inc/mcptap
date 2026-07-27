@@ -69,6 +69,12 @@ wherever you like.
 | `MCPTAP_NAME` | derived from command | Server name used in logs |
 | `MCPTAP_MAX_BYTES` | `4096` | Truncate logged payloads beyond this size |
 
+## Documentation
+
+Full docs live in [`docs/`](docs/README.md): [installation](docs/installation.md),
+[getting started](docs/getting-started.md), [CLI reference](docs/cli-reference.md),
+[log format](docs/log-format.md), and [FAQ](docs/faq.md).
+
 ## Why
 
 OWASP's MCP Top 10 lists *lack of audit and telemetry* (MCP08) as a core risk of
