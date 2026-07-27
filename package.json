@@ -1,0 +1,34 @@
+{
+  "name": "mcptap",
+  "version": "0.1.0",
+  "description": "Audit proxy for MCP servers — see and log every tool call your AI agents make",
+  "type": "module",
+  "bin": {
+    "mcptap": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "npm run build && node test/smoke.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "audit",
+    "security",
+    "ai-agents",
+    "logging",
+    "proxy"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}

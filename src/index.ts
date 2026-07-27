@@ -1,0 +1,47 @@
+#!/usr/bin/env node
+import { runProxy } from "./proxy.js";
+import { showLogs } from "./viewer.js";
+
+const HELP = `mcptap — audit proxy for MCP servers
+
+Usage:
+  mcptap -- <command> [args...]     Run an MCP server through the audit proxy
+  mcptap logs [server] [options]    View logged traffic
+
+Options for logs:
+  --tail N     Show last N entries (default 50)
+  -f           Follow new entries live
+
+Examples:
+  mcptap -- npx -y @modelcontextprotocol/server-filesystem /tmp
+  mcptap logs
+  mcptap logs server-filesystem -f
+
+In an MCP client config, wrap the command:
+  { "command": "mcptap", "args": ["--", "npx", "-y", "@modelcontextprotocol/server-github"] }
+
+Logs are written to ~/.mcptap/logs/ as JSONL. Set MCPTAP_NAME to override the
+server name, MCPTAP_MAX_BYTES to change payload truncation (default 4096).
+`;
+
+const argv = process.argv.slice(2);
+
+const sep = argv.indexOf("--");
+if (sep >= 0) {
+  const [cmd, ...args] = argv.slice(sep + 1);
+  if (!cmd) {
+    process.stderr.write("mcptap: no command after --\n");
+    process.exit(1);
+  }
+  runProxy(cmd, args);
+} else if (argv[0] === "logs") {
+  const rest = argv.slice(1);
+  const follow = rest.includes("-f") || rest.includes("--follow");
+  const tailIdx = rest.indexOf("--tail");
+  const tail = tailIdx >= 0 ? Number(rest[tailIdx + 1]) || 50 : 50;
+  const server = rest.find((a) => !a.startsWith("-") && a !== String(tail));
+  showLogs(server, tail, follow);
+} else {
+  console.log(HELP);
+  process.exit(argv.length === 0 || argv[0] === "help" || argv[0] === "--help" ? 0 : 1);
+}
