@@ -34,9 +34,11 @@ The fast way — let the wizard find your clients and wrap everything:
 mcptap setup
 ```
 
-It detects Claude Code, Claude Desktop, Codex CLI, Cursor, Windsurf, and project
-`.mcp.json` files, shows what it found, and wraps the servers you select. Every
-modified config gets a timestamped backup, and `mcptap setup --undo` reverses it.
+It detects 13 clients — Claude Code (including per-project servers), Claude
+Desktop, Codex CLI, Cursor, Windsurf, VS Code, VS Code Insiders, Cline, Roo Code,
+Gemini CLI, LM Studio, Zed, and project `.mcp.json` files — shows what it found,
+and wraps the servers you select. Every modified config gets a timestamped
+backup, and `mcptap setup --undo` reverses it.
 
 The manual way — wrap the server command in your MCP client config. Before:
 

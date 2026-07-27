@@ -18,6 +18,11 @@ export async function runSetup(ids: string[], opts: { undo: boolean; yes: boolea
     return;
   }
 
+  const notFound = all.filter((c) => !c.exists);
+  if (notFound.length && !opts.yes && ids.length === 0) {
+    console.log(`${C.dim}not detected: ${notFound.map((c) => c.name).join(", ")}${C.reset}\n`);
+  }
+
   let targets: ClientStatus[];
 
   if (ids.length > 0) {
@@ -39,7 +44,9 @@ export async function runSetup(ids: string[], opts: { undo: boolean; yes: boolea
       const already = !opts.undo && c.wrapped > 0 ? `, ${c.wrapped} already wrapped` : "";
       return {
         label: c.name,
-        hint: n > 0 ? `(${n} server${n === 1 ? "" : "s"}${already})` : `(nothing to ${opts.undo ? "unwrap" : "wrap"})`,
+        hint: n > 0
+          ? `(${n} server${n === 1 ? "" : "s"}${already})`
+          : c.wrapped > 0 ? `(all ${c.wrapped} already wrapped)` : `(no MCP servers configured)`,
         checked: n > 0,
         disabled: n === 0,
       };

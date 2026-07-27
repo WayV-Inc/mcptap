@@ -7,11 +7,18 @@ servers each config has, and wraps the ones you select with `mcptap --`.
 
 | Client id | Config file |
 |---|---|
-| `claude-code` | `~/.claude.json` |
+| `claude-code` | `~/.claude.json` — global servers **and** per-project servers under `projects` |
 | `claude-desktop` | `~/Library/Application Support/Claude/claude_desktop_config.json` (per-platform) |
-| `codex` | `~/.codex/config.toml` |
+| `codex` | `~/.codex/config.toml` (TOML) |
 | `cursor` | `~/.cursor/mcp.json` |
 | `windsurf` | `~/.codeium/windsurf/mcp_config.json` |
+| `vscode` | VS Code user profile `mcp.json` (`servers` key) |
+| `vscode-insiders` | VS Code Insiders user profile `mcp.json` |
+| `cline` | Cline extension `cline_mcp_settings.json` |
+| `roo` | Roo Code extension `mcp_settings.json` |
+| `gemini` | `~/.gemini/settings.json` |
+| `lmstudio` | `~/.lmstudio/mcp.json` |
+| `zed` | `~/.config/zed/settings.json` (`context_servers`, object-style commands supported) |
 | `project` | `./.mcp.json` in the current folder |
 
 Safety behavior: a timestamped backup is written next to any file before it's
