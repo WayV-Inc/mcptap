@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { LOG_DIR, LogEntry } from "./logger.js";
+import { LOG_DIR, LogEntry, isErrorEntry } from "./logger.js";
 
 const C = {
   dim: "\x1b[2m", reset: "\x1b[0m", cyan: "\x1b[36m", green: "\x1b[32m",
@@ -23,12 +23,19 @@ function formatEntry(e: LogEntry): string {
       return `${time} ${server} ${C.bold}→ ${e.method}${C.reset} ${C.dim}${short(e.params)}${C.reset}`;
     case "response": {
       const dur = e.durationMs !== undefined ? ` ${C.dim}(${e.durationMs}ms)${C.reset}` : "";
-      return e.error !== undefined
-        ? `${time} ${server} ${C.red}← ${e.method ?? "?"} ERROR${C.reset}${dur} ${C.dim}${short(e.error)}${C.reset}`
+      return isErrorEntry(e)
+        ? `${time} ${server} ${C.red}← ${e.method ?? "?"} ERROR${C.reset}${dur} ${C.dim}${short(e.error ?? e.result)}${C.reset}`
         : `${time} ${server} ${C.green}← ${e.method ?? "?"} ok${C.reset}${dur}`;
     }
     case "notification":
       return `${time} ${server} ${C.yellow}· ${e.method}${C.reset}`;
+    case "alert": {
+      const warn = e.severity === "warn";
+      const marker = warn ? `${C.red}${C.bold}⚠${C.reset}` : `${C.yellow}ℹ${C.reset}`;
+      const changeColor = warn ? C.red : C.yellow;
+      const head = `${time} ${server} ${marker} ${changeColor}${e.change}${C.reset} ${C.dim}${e.tool}${C.reset}`;
+      return e.detail ? `${head}\n${C.dim}   ${e.detail}${C.reset}` : head;
+    }
     default:
       return `${time} ${server} ${C.dim}raw: ${e.raw}${C.reset}`;
   }

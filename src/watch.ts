@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { LOG_DIR, LogEntry } from "./logger.js";
+import { LOG_DIR, LogEntry, isErrorEntry } from "./logger.js";
 
 /** Truecolor palette matching the mcptap brand. */
 const amber = (s: string) => `\x1b[38;2;232;163;61m${s}\x1b[39m`;
@@ -15,7 +15,12 @@ const BUCKET_MS = 3000;
 const BUCKETS = 30;
 
 interface ToolAgg { calls: number; errors: number; durations: number[] }
-interface ServerAgg { calls: number; errors: number; durations: number[]; last: number; tools: Map<string, ToolAgg> }
+interface ServerAgg {
+  calls: number; errors: number; durations: number[]; last: number; tools: Map<string, ToolAgg>;
+  client?: string;     // "name version", from the most recent initialize seen
+  model?: string;      // last observed model (via sampling/createMessage — rare)
+  connStart?: number;  // epoch ms of the most recent initialize handshake
+}
 
 function visLen(s: string): string { return s; }
 function pad(s: string, n: number): string {
@@ -24,6 +29,14 @@ function pad(s: string, n: number): string {
 }
 function trunc(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, Math.max(0, n - 1)) + "…";
+}
+function fmtUptime(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+function fmtClient(ci: { name?: string; version?: string }): string | undefined {
+  if (!ci.name && !ci.version) return undefined;
+  return [ci.name, ci.version].filter(Boolean).join(" ");
 }
 
 export function runWatch(serverFilter?: string): void {
@@ -39,11 +52,22 @@ export function runWatch(serverFilter?: string): void {
   };
   const reqLabel = new Map<string, string>();
   const offsets = new Map<string, number>();
+  // Identity/uptime seeded from log backlog, keyed by server, NOT yet promoted into
+  // state.servers — a server with zero live traffic this session must stay invisible
+  // (an old log file lying around must never resurrect a long-dead connection as a
+  // row on the live dashboard). Merged in the moment that server produces real traffic.
+  const discovered = new Map<string, { connStart?: number; client?: string }>();
 
   const label = (e: LogEntry): string =>
     e.method === "tools/call" && (e.params as any)?.name
       ? `${(e.params as any).name}`
       : e.method || "?";
+
+  function getServer(name: string): ServerAgg {
+    let s = state.servers.get(name);
+    if (!s) { s = { calls: 0, errors: 0, durations: [], last: 0, tools: new Map<string, ToolAgg>() }; state.servers.set(name, s); }
+    return s;
+  }
 
   function ingest(e: LogEntry): void {
     if (serverFilter && !e.server.startsWith(serverFilter)) return;
@@ -55,18 +79,30 @@ export function runWatch(serverFilter?: string): void {
     }
     if (e.kind === "request" && e.id !== undefined && e.id !== null) {
       reqLabel.set(`${e.server} ${e.id}`, label(e));
+      if (e.method === "initialize") {
+        const srv = getServer(e.server);
+        const ts = Date.parse(e.ts);
+        if (!Number.isNaN(ts)) srv.connStart = ts; // most recent initialize wins
+        if (e.clientInfo) { const c = fmtClient(e.clientInfo); if (c) srv.client = c; }
+      }
       return;
     }
     if (e.kind !== "response") return;
 
     const l = reqLabel.get(`${e.server} ${e.id}`) ?? e.method ?? "?";
     reqLabel.delete(`${e.server} ${e.id}`);
-    const isErr = e.error !== undefined;
+    const isErr = isErrorEntry(e);
 
-    const srv: ServerAgg = state.servers.get(e.server) ?? { calls: 0, errors: 0, durations: [], last: 0, tools: new Map<string, ToolAgg>() };
-    state.servers.set(e.server, srv);
+    const firstLiveActivity = !state.servers.has(e.server);
+    const srv = getServer(e.server);
+    if (firstLiveActivity) {
+      const seed = discovered.get(e.server);
+      if (seed?.connStart) srv.connStart = seed.connStart;
+      if (seed?.client) srv.client = seed.client;
+    }
     srv.calls++; srv.last = Date.parse(e.ts) || Date.now();
     if (isErr) srv.errors++;
+    if (e.model) srv.model = e.model;
     if (typeof e.durationMs === "number") srv.durations.push(e.durationMs);
 
     const t: ToolAgg = srv.tools.get(l) ?? { calls: 0, errors: 0, durations: [] };
@@ -80,6 +116,33 @@ export function runWatch(serverFilter?: string): void {
     state.feed = state.feed.slice(0, 40);
   }
 
+  /** One-time, bounded backward scan of a newly-discovered log file: find the
+   *  most recent initialize request to seed a real connStart/client for the
+   *  uptime display, WITHOUT feeding this historical content into live
+   *  calls/errors/durations (poll() already skips it for that purpose). Files
+   *  are daily-rotated per server, so a single whole-file read is bounded by
+   *  construction — this runs once per file, not per poll tick. */
+  function seedConnStart(file: string): void {
+    let content = "";
+    try { content = fs.readFileSync(file, "utf8"); } catch { return; }
+    const lines = content.split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      let e: LogEntry;
+      try { e = JSON.parse(line); } catch { continue; }
+      if (e.kind === "request" && e.method === "initialize") {
+        if (serverFilter && !e.server.startsWith(serverFilter)) return;
+        const ts = Date.parse(e.ts);
+        const seed: { connStart?: number; client?: string } = {};
+        if (!Number.isNaN(ts)) seed.connStart = ts;
+        if (e.clientInfo) { const c = fmtClient(e.clientInfo); if (c) seed.client = c; }
+        if (seed.connStart !== undefined || seed.client !== undefined) discovered.set(e.server, seed);
+        return; // last (most recent) initialize found — done
+      }
+    }
+  }
+
   function poll(): void {
     let files: string[] = [];
     try {
@@ -89,7 +152,7 @@ export function runWatch(serverFilter?: string): void {
       let size = 0;
       try { size = fs.statSync(file).size; } catch { continue; }
       const prev = offsets.get(file);
-      if (prev === undefined) { offsets.set(file, size); continue; } // start live, ignore history
+      if (prev === undefined) { offsets.set(file, size); seedConnStart(file); continue; } // start live, ignore history
       if (size <= prev) { if (size < prev) offsets.set(file, size); continue; }
       try {
         const fd = fs.openSync(file, "r");
@@ -123,8 +186,7 @@ export function runWatch(serverFilter?: string): void {
     const line = (s = "") => out.push(`${dim("│")} ${pad(s, inner - 2)} ${dim("│")}`);
     const rule = (l: string, r: string, mid = "─") => out.push(dim(l + mid.repeat(inner) + r));
 
-    const upt = Math.floor((Date.now() - state.started) / 1000);
-    const uptStr = upt < 60 ? `${upt}s` : `${Math.floor(upt / 60)}m ${upt % 60}s`;
+    const uptStr = fmtUptime(Date.now() - state.started);
 
     // header
     const title = `${bold(ink("[—"))}${amber("●")}${bold(ink("—]"))}  ${bold(ink("mcptap"))} ${dim("live")}`;
@@ -154,14 +216,20 @@ export function runWatch(serverFilter?: string): void {
     // servers
     rule("├", "┤");
     line(dim(`${pad("server", 20)}${pad("calls", 8)}${pad("err", 6)}${pad("avg", 7)}${"top tool"}`));
-    if (state.servers.size === 0) {
+    const sorted = [...state.servers.entries()].sort((a, b) => b[1].calls - a[1].calls);
+    if (sorted.length === 0) {
       line(dim("  waiting for traffic…"));
       line(dim("  use your AI client normally — wrapped servers appear here the moment they're called"));
     } else {
-      for (const [name, s] of [...state.servers.entries()].sort((a, b) => b[1].calls - a[1].calls).slice(0, 6)) {
+      // Each server is now 2 lines (summary + sub-line). Reserve room below for the
+      // feed's own header rule + its 4-row floor + the closing rule.
+      const FEED_RESERVE = 8;
+      const available = Math.max(2, (process.stdout.rows || 30) - out.length - FEED_RESERVE);
+      const maxServers = Math.max(1, Math.floor(available / 2));
+      const shown = sorted.slice(0, maxServers);
+      for (const [name, s] of shown) {
         const top = [...s.tools.entries()].sort((a, b) => b[1].calls - a[1].calls)[0];
         const barW = 14;
-        const topMax = top ? top[1].calls : 1;
         const filled = top ? Math.max(1, Math.round((top[1].calls / Math.max(1, s.calls)) * barW)) : 0;
         const bar = amber("▄".repeat(filled)) + dim("▄".repeat(barW - filled));
         line(
@@ -171,6 +239,15 @@ export function runWatch(serverFilter?: string): void {
           pad(dim(`${avg(s.durations)}ms`), 7) +
           `${bar} ${dim(trunc(top ? top[0] : "—", 16))}`
         );
+        const parts: string[] = [];
+        if (s.connStart) parts.push(`up ${fmtUptime(Date.now() - s.connStart)}`);
+        if (s.client) parts.push(`client: ${trunc(s.client, 24)}`);
+        if (s.model) parts.push(`model: ${trunc(s.model, 20)} (via sampling)`);
+        const sub = parts.length ? `  ${parts.join(" · ")}` : "  connection info unknown (predates this version, or reconnect not yet seen)";
+        line(dim(trunc(sub, inner - 2)));
+      }
+      if (sorted.length > shown.length) {
+        line(dim(`  +${sorted.length - shown.length} more — see mcptap stats`));
       }
     }
 
