@@ -12,7 +12,7 @@
   "description": "Audit proxy for MCP servers — see and log every tool call your AI agents make",
   "type": "module",
   "bin": {
-    "mcptap": "./dist/index.js"
+    "mcptap": "dist/index.js"
   },
   "files": [
     "dist"
