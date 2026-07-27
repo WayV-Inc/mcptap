@@ -28,7 +28,17 @@ The command is still just `mcptap`.
 
 ## Use
 
-Wrap the server command in your MCP client config. Before:
+The fast way — let the wizard find your clients and wrap everything:
+
+```sh
+mcptap setup
+```
+
+It detects Claude Code, Claude Desktop, Codex CLI, Cursor, Windsurf, and project
+`.mcp.json` files, shows what it found, and wraps the servers you select. Every
+modified config gets a timestamped backup, and `mcptap setup --undo` reverses it.
+
+The manual way — wrap the server command in your MCP client config. Before:
 
 ```json
 { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"] }

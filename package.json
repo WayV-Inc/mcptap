@@ -1,6 +1,6 @@
 {
   "name": "@wayv-software/mcptap",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publishConfig": {
     "access": "public"
   },
@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
-    "test": "npm run build && node test/smoke.js"
+    "test": "npm run build && node test/smoke.js && node test/setup.test.js"
   },
   "keywords": [
     "mcp",

@@ -1,5 +1,28 @@
 # CLI reference
 
+## `mcptap setup [clients...] [--yes] [--undo]`
+
+Interactive onboarding. Detects installed MCP clients, shows how many stdio
+servers each config has, and wraps the ones you select with `mcptap --`.
+
+| Client id | Config file |
+|---|---|
+| `claude-code` | `~/.claude.json` |
+| `claude-desktop` | `~/Library/Application Support/Claude/claude_desktop_config.json` (per-platform) |
+| `codex` | `~/.codex/config.toml` |
+| `cursor` | `~/.cursor/mcp.json` |
+| `windsurf` | `~/.codeium/windsurf/mcp_config.json` |
+| `project` | `./.mcp.json` in the current folder |
+
+Safety behavior: a timestamped backup is written next to any file before it's
+modified; already-wrapped servers are skipped (idempotent); HTTP/SSE servers are
+left untouched; Codex TOML servers with arguments the parser can't handle safely
+are skipped with a note rather than guessed at.
+
+Flags: name client ids to skip the picker (`mcptap setup claude-code codex --yes`);
+`--yes` applies to all detected clients without prompting (required when no TTY);
+`--undo` reverses the wrap, restoring original commands.
+
 ## `mcptap -- <command> [args...]`
 
 Runs `<command>` as a child process and proxies its stdio, logging all MCP

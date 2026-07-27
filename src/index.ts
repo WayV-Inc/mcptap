@@ -5,8 +5,15 @@ import { showLogs } from "./viewer.js";
 const HELP = `mcptap — audit proxy for MCP servers
 
 Usage:
+  mcptap setup [clients...]         Interactive onboarding: auto-wrap your MCP
+                                    client configs (Claude Code, Claude Desktop,
+                                    Codex, Cursor, Windsurf, project .mcp.json)
   mcptap -- <command> [args...]     Run an MCP server through the audit proxy
   mcptap logs [server] [options]    View logged traffic
+
+Options for setup:
+  --yes        Apply without the interactive picker (needed when not a TTY)
+  --undo       Reverse: unwrap servers back to their original commands
 
 Options for logs:
   --tail N     Show last N entries (default 50)
@@ -34,6 +41,13 @@ if (sep >= 0) {
     process.exit(1);
   }
   runProxy(cmd, args);
+} else if (argv[0] === "setup") {
+  const rest = argv.slice(1);
+  const undo = rest.includes("--undo");
+  const yes = rest.includes("--yes") || rest.includes("--all");
+  const ids = rest.filter((a) => !a.startsWith("-"));
+  const { runSetup } = await import("./setup-cli.js");
+  await runSetup(ids, { undo, yes });
 } else if (argv[0] === "logs") {
   const rest = argv.slice(1);
   const follow = rest.includes("-f") || rest.includes("--follow");

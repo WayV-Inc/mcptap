@@ -1,5 +1,15 @@
 # Getting started
 
+The fastest path is the wizard:
+
+```sh
+mcptap setup
+```
+
+Pick your clients from the list, restart them, done. The rest of this page is
+the manual version — useful for understanding what the wizard does, or for
+clients it doesn't know about.
+
 The pattern is always the same: wherever your MCP client config has a server
 command, prefix it with `mcptap --`.
 
