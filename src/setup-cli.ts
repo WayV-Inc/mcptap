@@ -45,13 +45,17 @@ export async function runSetup(ids: string[], opts: { undo: boolean; yes: boolea
     const items = found.map((c) => {
       const n = opts.undo ? c.wrapped : c.wrappable;
       const already = !opts.undo && c.wrapped > 0 ? `, ${c.wrapped} already wrapped` : "";
+      const empty = c.wrappable + c.wrapped === 0;
       return {
         label: c.name,
         hint: n > 0
           ? `(${n} server${n === 1 ? "" : "s"}${already})`
-          : c.wrapped > 0 ? `(all ${c.wrapped} already wrapped)` : `(no MCP servers configured)`,
+          : c.wrapped > 0 ? `(all ${c.wrapped} already wrapped)`
+          : `(no servers yet — select to install starters)`,
         checked: n > 0,
-        disabled: n === 0,
+        // In wrap mode, empty clients stay selectable: choosing them offers
+        // starter-server provisioning after the wrap step.
+        disabled: opts.undo ? n === 0 : (n === 0 && !empty),
       };
     });
     const picked = await checkboxes(
@@ -72,6 +76,30 @@ export async function runSetup(ids: string[], opts: { undo: boolean; yes: boolea
   if (targets.length === 0) {
     console.log(`Nothing to do — every detected client is ${opts.undo ? "already unwrapped" : "already wrapped"}.`);
     return;
+  }
+
+  // Remember the full selection (autopilot should watch provisioned clients too)
+  const selectedIds = targets.map((t) => t.id);
+
+  // Selected clients with no servers at all: offer to install starters (interactive only)
+  if (!opts.undo && !opts.yes && ids.length === 0 && process.stdin.isTTY) {
+    const { ADDABLE, pickServersInteractive, askDirIfNeeded, applyProvision } = await import("./add.js");
+    const empty = targets.filter((t) => t.wrappable + t.wrapped === 0);
+    const provisionable = empty.filter((t) => ADDABLE.has(t.id));
+    for (const t of empty.filter((t) => !ADDABLE.has(t.id)))
+      console.log(`${C.dim}${t.name}: no servers, and mcptap can't safely add to this config type — set one up in the app first.${C.reset}`);
+    if (provisionable.length) {
+      console.log(`\n${C.bold}${provisionable.map((t) => t.name).join(", ")}${C.reset} ${provisionable.length === 1 ? "has" : "have"} no MCP servers yet — installing starters for ${provisionable.length === 1 ? "it" : "them"}.`);
+      const cats = await pickServersInteractive();
+      if (cats) {
+        const dir = await askDirIfNeeded(cats, "");
+        applyProvision(provisionable, cats, dir);
+      } else {
+        console.log(`${C.dim}Skipped starters. Add later with: mcptap add${C.reset}`);
+      }
+    }
+    // remove empty clients from the wrap phase — provisioning already handled them
+    targets = targets.filter((t) => t.wrappable + t.wrapped > 0);
   }
 
   console.log("");
@@ -114,7 +142,7 @@ export async function runSetup(ids: string[], opts: { undo: boolean; yes: boolea
     rl.close();
     if (ans === "" || ans === "y" || ans === "yes") {
       const { autopilot } = await import("./autopilot.js");
-      await autopilot("on", targets.map((t) => t.id));
+      await autopilot("on", selectedIds);
     } else {
       console.log(`${C.dim}Skipped. Enable later with: mcptap autopilot on${C.reset}`);
     }

@@ -49,7 +49,12 @@ function readEntries(file: string): LogEntry[] {
   return out;
 }
 
-export function showLogs(server: string | undefined, tail: number, follow: boolean): void {
+/** All entries across log files, oldest first. */
+export function readAllEntries(server?: string): LogEntry[] {
+  return listLogFiles(server).flatMap(readEntries).sort((a, b) => a.ts.localeCompare(b.ts));
+}
+
+export function showLogs(server: string | undefined, tail: number, follow: boolean, json = false): void {
   const files = listLogFiles(server);
   if (files.length === 0) {
     console.log(`No logs found in ${LOG_DIR}${server ? ` for "${server}"` : ""}.`);
@@ -60,7 +65,7 @@ export function showLogs(server: string | undefined, tail: number, follow: boole
   const entries = files.flatMap(readEntries)
     .sort((a, b) => a.ts.localeCompare(b.ts))
     .slice(-tail);
-  for (const e of entries) console.log(formatEntry(e));
+  for (const e of entries) console.log(json ? JSON.stringify(e) : formatEntry(e));
 
   if (!follow) return;
 
@@ -79,7 +84,7 @@ export function showLogs(server: string | undefined, tail: number, follow: boole
       offset = size;
       for (const line of buf.toString("utf8").split("\n")) {
         if (!line.trim()) continue;
-        try { console.log(formatEntry(JSON.parse(line))); } catch { /* skip */ }
+        try { console.log(json ? line : formatEntry(JSON.parse(line))); } catch { /* skip */ }
       }
     } catch { /* file may rotate */ }
   }, 500);

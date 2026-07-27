@@ -26,6 +26,10 @@ modified; already-wrapped servers are skipped (idempotent); HTTP/SSE servers are
 left untouched; Codex TOML servers with arguments the parser can't handle safely
 are skipped with a note rather than guessed at.
 
+Clients with no MCP servers are still selectable in the picker — choosing them
+routes into the `mcptap add` starter-server flow, so a completely empty machine
+can go from nothing to fully monitored in one command.
+
 Flags: name client ids to skip the picker (`mcptap setup claude-code codex --yes`);
 `--yes` applies to all detected clients without prompting (required when no TTY);
 `--undo` reverses the wrap, restoring original commands.
@@ -89,6 +93,7 @@ Prints logged traffic, oldest first, colorized.
 | `[server]` | Only entries for servers whose log files start with this name |
 | `--tail N` | Show the last N entries (default 50) |
 | `-f`, `--follow` | After printing, follow the newest log file live (0.5s poll) |
+| `--json` | Print raw JSONL entries instead of the colorized view (pipe to `jq`) |
 
 Output line anatomy:
 
@@ -97,6 +102,19 @@ Output line anatomy:
 14:02:15 server-filesystem ← tools/call ok (3ms)                 ← response + duration
 14:02:20 server-filesystem ← tools/call ERROR (1ms) {"code":…}   ← error response
 14:02:21 server-filesystem · notifications/progress              ← notification
+```
+
+## `mcptap stats [server]`
+
+Aggregated view of everything logged: per server and per tool, the call count,
+error count, and average/p95 latency. `tools/call` entries are broken out by
+tool name:
+
+```
+statsdemo
+  call                     count  errors  avg ms  p95 ms
+  tools/call · read_file      41       0       3       9
+  tools/call · write_file     12       2       5      14
 ```
 
 ## `mcptap help`

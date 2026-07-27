@@ -19,7 +19,7 @@ export const CATALOG: CatalogEntry[] = [
 ];
 
 // Clients we can add servers to. Zed is excluded (different entry schema semantics).
-const ADDABLE = new Set(["claude-code", "claude-desktop", "codex", "cursor", "windsurf", "vscode", "vscode-insiders", "cline", "roo", "gemini", "lmstudio", "project"]);
+export const ADDABLE = new Set(["claude-code", "claude-desktop", "codex", "cursor", "windsurf", "vscode", "vscode-insiders", "cline", "roo", "gemini", "lmstudio", "project"]);
 // Dedicated MCP config files we may create when absent. App-managed/shared files are never created.
 const CREATABLE = new Set(["claude-desktop", "cursor", "windsurf", "vscode", "vscode-insiders", "cline", "roo", "lmstudio", "project"]);
 
@@ -101,6 +101,46 @@ function addToToml(def: ClientDef, cats: CatalogEntry[], dir: string): { added: 
   return res;
 }
 
+/** Interactive server picker. Returns null on cancel/non-TTY. */
+export async function pickServersInteractive(): Promise<CatalogEntry[] | null> {
+  const picked = await checkboxes("Which servers do you want?", CATALOG.map((c, i) => ({
+    label: c.id, hint: `— ${c.desc}`, checked: i === 0, disabled: false,
+  })));
+  if (picked === null || picked.length === 0) return null;
+  return picked.map((i) => CATALOG[i]);
+}
+
+/** Ask for the filesystem server's folder if needed. */
+export async function askDirIfNeeded(cats: CatalogEntry[], dir: string): Promise<string> {
+  if (!cats.some((c) => c.needsDir) || dir) return dir || os.homedir();
+  const fallback = os.homedir();
+  if (!process.stdin.isTTY) return fallback;
+  const { createInterface } = await import("node:readline/promises");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = (await rl.question(`Folder the filesystem server may access [${fallback}]: `)).trim() || fallback;
+  rl.close();
+  return answer;
+}
+
+/** Apply provisioning to targets and print a summary. Returns count added. */
+export function applyProvision(targets: ClientDef[], cats: CatalogEntry[], dir: string): number {
+  console.log("");
+  let total = 0;
+  for (const t of targets) {
+    const r = t.format === "json" ? addToJson(t, cats, dir) : addToToml(t, cats, dir);
+    if (r.error) { console.log(`${C.red}✗ ${t.name}: ${r.error}${C.reset}`); continue; }
+    total += r.added.length;
+    if (r.added.length) console.log(`${C.green}✓${C.reset} ${C.bold}${t.name}${C.reset} — added: ${r.added.join(", ")}`);
+    else console.log(`${C.dim}· ${t.name} — already present${C.reset}`);
+    if (r.skipped.length) console.log(`  ${C.dim}already there: ${r.skipped.join(", ")}${C.reset}`);
+    if (r.backup) console.log(`  ${C.dim}backup: ${r.backup}${C.reset}`);
+  }
+  if (total > 0) {
+    console.log(`\n${C.bold}Done.${C.reset} Restart the clients, use them, then ${C.cyan}mcptap logs -f${C.reset} to watch the calls.`);
+  }
+  return total;
+}
+
 export async function runAdd(argv: string[]): Promise<void> {
   const yes = argv.includes("--yes");
   const dirFlag = argv.indexOf("--dir");
@@ -122,16 +162,14 @@ export async function runAdd(argv: string[]): Promise<void> {
     }
     cats = CATALOG.filter((c) => positional.includes(c.id));
   } else {
-    const picked = await checkboxes("Which servers do you want?", CATALOG.map((c, i) => ({
-      label: c.id, hint: `— ${c.desc}`, checked: i === 0, disabled: false,
-    })));
-    if (picked === null || picked.length === 0) {
-      console.log(picked === null && !process.stdin.isTTY
+    const picked = await pickServersInteractive();
+    if (picked === null) {
+      console.log(!process.stdin.isTTY
         ? `Not an interactive terminal — name servers and clients: ${C.bold}mcptap add memory --to claude-code --yes${C.reset}`
         : "Cancelled. Nothing was changed.");
       return;
     }
-    cats = picked.map((i) => CATALOG[i]);
+    cats = picked;
   }
 
   // -- which clients --
@@ -169,29 +207,7 @@ export async function runAdd(argv: string[]): Promise<void> {
   }
 
   // -- filesystem dir --
-  if (cats.some((c) => c.needsDir) && !dir) {
-    const fallback = os.homedir();
-    if (process.stdin.isTTY && !yes) {
-      const { createInterface } = await import("node:readline/promises");
-      const rl = createInterface({ input: process.stdin, output: process.stdout });
-      dir = (await rl.question(`Folder the filesystem server may access [${fallback}]: `)).trim() || fallback;
-      rl.close();
-    } else dir = fallback;
-  }
+  dir = yes && !dir ? (cats.some((c) => c.needsDir) ? os.homedir() : dir) : await askDirIfNeeded(cats, dir);
 
-  // -- apply --
-  console.log("");
-  let total = 0;
-  for (const t of targets) {
-    const r = t.format === "json" ? addToJson(t, cats, dir) : addToToml(t, cats, dir);
-    if (r.error) { console.log(`${C.red}✗ ${t.name}: ${r.error}${C.reset}`); continue; }
-    total += r.added.length;
-    if (r.added.length) console.log(`${C.green}✓${C.reset} ${C.bold}${t.name}${C.reset} — added: ${r.added.join(", ")}`);
-    else console.log(`${C.dim}· ${t.name} — already present${C.reset}`);
-    if (r.skipped.length) console.log(`  ${C.dim}already there: ${r.skipped.join(", ")}${C.reset}`);
-    if (r.backup) console.log(`  ${C.dim}backup: ${r.backup}${C.reset}`);
-  }
-  if (total > 0) {
-    console.log(`\n${C.bold}Done.${C.reset} Restart the clients, use them, then ${C.cyan}mcptap logs -f${C.reset} to watch the calls.`);
-  }
+  applyProvision(targets, cats, dir);
 }

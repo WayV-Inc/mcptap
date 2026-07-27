@@ -1,6 +1,9 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
 import { runProxy } from "./proxy.js";
 import { showLogs } from "./viewer.js";
+
+const VERSION: string = createRequire(import.meta.url)("../package.json").version;
 
 const HELP = `mcptap — audit proxy for MCP servers
 
@@ -16,7 +19,9 @@ Usage:
                                     client config files and wraps new MCP
                                     servers the moment they're added (macOS)
   mcptap -- <command> [args...]     Run an MCP server through the audit proxy
-  mcptap logs [server] [options]    View logged traffic
+  mcptap logs [server] [options]    View logged traffic (--json for raw JSONL)
+  mcptap stats [server]             Call counts, error rates, and latency
+                                    per server and tool
 
 Options for setup:
   --yes        Apply without the interactive picker (needed when not a TTY)
@@ -64,10 +69,16 @@ if (sep >= 0) {
 } else if (argv[0] === "logs") {
   const rest = argv.slice(1);
   const follow = rest.includes("-f") || rest.includes("--follow");
+  const json = rest.includes("--json");
   const tailIdx = rest.indexOf("--tail");
   const tail = tailIdx >= 0 ? Number(rest[tailIdx + 1]) || 50 : 50;
   const server = rest.find((a) => !a.startsWith("-") && a !== String(tail));
-  showLogs(server, tail, follow);
+  showLogs(server, tail, follow, json);
+} else if (argv[0] === "stats") {
+  const { showStats } = await import("./stats.js");
+  showStats(argv.slice(1).find((a) => !a.startsWith("-")));
+} else if (argv[0] === "--version" || argv[0] === "-v" || argv[0] === "version") {
+  console.log(VERSION);
 } else {
   console.log(HELP);
   process.exit(argv.length === 0 || argv[0] === "help" || argv[0] === "--help" ? 0 : 1);
