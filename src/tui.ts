@@ -29,7 +29,7 @@ export function checkboxes(title: string, items: ChoiceItem[]): Promise<number[]
       if (rendered) process.stdout.write(`\x1b[${rendered}A`);
       const lines: string[] = [];
       lines.push(`${C.bold}${title}${C.reset}`);
-      lines.push(`${C.dim}space toggle · a all · enter confirm · q cancel${C.reset}`);
+      lines.push(`${C.dim}space toggle · a all · n none · enter confirm · q cancel${C.reset}`);
       items.forEach((it, i) => {
         const ptr = i === cursor ? `${C.amber}❯${C.reset}` : " ";
         const box = it.disabled
@@ -66,10 +66,10 @@ export function checkboxes(title: string, items: ChoiceItem[]): Promise<number[]
       if (key.name === "up" || key.name === "k") move(-1);
       else if (key.name === "down" || key.name === "j") move(1);
       else if (key.name === "space") { if (!items[cursor].disabled) items[cursor].checked = !items[cursor].checked; }
-      else if (key.name === "a") {
-        const any = items.some((i) => !i.disabled && !i.checked);
-        items.forEach((i) => { if (!i.disabled) i.checked = any; });
-      }
+      // "a" always selects all and "n" always clears — a toggle here is a trap:
+      // pressing "a" when everything is already checked would silently deselect.
+      else if (key.name === "a") items.forEach((i) => { if (!i.disabled) i.checked = true; });
+      else if (key.name === "n") items.forEach((i) => { if (!i.disabled) i.checked = false; });
       else if (key.name === "return") { render(); return done(items.map((it, i) => (it.checked && !it.disabled ? i : -1)).filter((i) => i >= 0)); }
       else if (key.name === "q" || key.name === "escape" || (key.ctrl && key.name === "c")) { render(); return done(null); }
       render();

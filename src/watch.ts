@@ -155,7 +155,8 @@ export function runWatch(serverFilter?: string): void {
     rule("├", "┤");
     line(dim(`${pad("server", 20)}${pad("calls", 8)}${pad("err", 6)}${pad("avg", 7)}${"top tool"}`));
     if (state.servers.size === 0) {
-      line(dim("  waiting for traffic… use your AI client and calls appear here live"));
+      line(dim("  waiting for traffic…"));
+      line(dim("  use your AI client normally — wrapped servers appear here the moment they're called"));
     } else {
       for (const [name, s] of [...state.servers.entries()].sort((a, b) => b[1].calls - a[1].calls).slice(0, 6)) {
         const top = [...s.tools.entries()].sort((a, b) => b[1].calls - a[1].calls)[0];
@@ -186,22 +187,41 @@ export function runWatch(serverFilter?: string): void {
     process.stdout.write(`\x1b[H\x1b[2J${out.join("\n")}\n`);
   }
 
+  // Make sure the log dir exists so the first poll doesn't no-op forever.
+  try { fs.mkdirSync(LOG_DIR, { recursive: true }); } catch { /* ignore */ }
+
   // alt screen + cursor hide
   process.stdout.write("\x1b[?1049h\x1b[?25l");
+  let closed = false;
   const cleanup = () => {
+    if (closed) return;
+    closed = true;
     process.stdout.write("\x1b[?25h\x1b[?1049l");
     process.exit(0);
   };
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(true);
     process.stdin.resume();
+    // Ignore anything already buffered (leftover keystrokes from the shell or a
+    // previous prompt would otherwise quit the dashboard the instant it opens).
+    let accepting = false;
+    setTimeout(() => { process.stdin.read?.(); accepting = true; }, 250);
     process.stdin.on("data", (b) => {
+      if (!accepting) return;
       const s = b.toString();
-      if (s === "q" || s === "\x03" || s === "\x1b") cleanup();
+      // Only explicit quit keys. A bare ESC is excluded: arrow keys arrive as
+      // escape sequences that can split across chunks and look like a lone ESC.
+      if (s === "q" || s === "Q" || s === "\x03" || s === "\x04") cleanup();
     });
   }
   process.on("SIGINT", cleanup);
   process.on("SIGTERM", cleanup);
+  // Never strand the user in the alternate screen if something goes wrong.
+  process.on("uncaughtException", (err) => {
+    process.stdout.write("\x1b[?25h\x1b[?1049l");
+    console.error("mcptap watch error:", err?.message || err);
+    process.exit(1);
+  });
 
   poll(); render();
   setInterval(() => { poll(); rotateBuckets(); render(); }, 400);

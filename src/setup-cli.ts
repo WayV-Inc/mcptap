@@ -50,6 +50,7 @@ export async function runSetup(ids: string[], opts: { undo: boolean; yes: boolea
         label: c.name,
         hint: n > 0
           ? `(${n} server${n === 1 ? "" : "s"}${already})`
+          : opts.undo ? `(nothing wrapped)`
           : c.wrapped > 0 ? `(all ${c.wrapped} already wrapped)`
           : `(no servers yet — select to install starters)`,
         checked: n > 0,
@@ -68,6 +69,10 @@ export async function runSetup(ids: string[], opts: { undo: boolean; yes: boolea
       } else {
         console.log("Cancelled. Nothing was changed.");
       }
+      return;
+    }
+    if (picked.length === 0) {
+      console.log(`Nothing selected — no changes made. ${C.dim}(space toggles a client, a selects all)${C.reset}`);
       return;
     }
     targets = picked.map((i) => found[i]);
